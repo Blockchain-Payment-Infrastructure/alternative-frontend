@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  font-family: 'Space Grotesk', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+  color: #f5f6fb;
+  background-color: #05060a;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* CSS Variables for components */
+  --bg-gradient: radial-gradient(circle at top right, rgba(87, 65, 255, 0.25), transparent 45%),
+    radial-gradient(circle at 20% 0, rgba(0, 209, 255, 0.35), transparent 55%),
+    #05060a;
+  --surface: rgba(255, 255, 255, 0.04);
+  --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.3);
+  --border: rgba(255, 255, 255, 0.08);
+  --text-primary: #f4f5fb;
+  --text-secondary: #bcc2d8;
+  --text-tertiary: #8d92aa;
+  --primary: #6cf0ff;
+  --primary-alpha: rgba(108, 240, 255, 0.1);
+  --error-bg: rgba(239, 68, 68, 0.1);
+  --error-border: rgba(239, 68, 68, 0.3);
+  --error-text: #fca5a5;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #05060a;
+}
+
+p {
+  margin: 0;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  color: #8ea0c9;
+  margin-bottom: 0.5rem;
+}
+
+select {
+  background-color: #0f172a; /* Dark background (Slate-900) */
+  color: #ffffff;            /* White text */
+  border: 1px solid #334155; /* Subtle border */
+}
+
+/* Targets the list of options when opened */
+option {
+  background-color: #0f172a;
+  color: #ffffff;
+}

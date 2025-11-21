@@ -1,0 +1,271 @@
+<div class="page-shell">
+  @if (notifications().length) {
+    <div class="toast-stack">
+      @for (toast of notifications(); track toast.id) {
+        <div class="toast" [class]="toast.tone">
+          <p>{{ toast.text }}</p>
+          <button type="button" (click)="dismissToast(toast.id)" aria-label="Dismiss notification">
+            ✕
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  @if (!isAuthenticated()) {
+    <div class="auth-prompt">
+      <div class="auth-prompt-content">
+        <h2>Welcome to Blockchain Payments</h2>
+        <p>Please sign in or create an account to continue</p>
+        <div class="auth-prompt-actions">
+          <a routerLink="/login" class="primary">Sign in</a>
+          <a routerLink="/signup" class="secondary">Create account</a>
+        </div>
+      </div>
+    </div>
+  } @else {
+    <nav class="top-nav">
+      <div class="nav-content">
+        <div class="nav-brand">
+          <h3>Blockchain Payments</h3>
+        </div>
+        <div class="nav-actions">
+          <span class="user-email">{{ authService.authState().userEmail }}</span>
+          <button type="button" class="ghost" (click)="logout()">Logout</button>
+        </div>
+      </div>
+    </nav>
+  }
+
+  @if (isAuthenticated()) {
+    <header class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Blockchain-native payments orchestration</p>
+      <h1>Launch an auditable Web3 payment desk in minutes.</h1>
+      <p class="lede">
+        Connect your MetaMask wallet, orchestrate settlement across EVM chains, and let the backend
+        you built keep compliance checks, policy routing, and payment intelligence humming.
+      </p>
+      <div class="hero-actions">
+        <button
+          type="button"
+          class="primary"
+          (click)="connectWallet()"
+          [disabled]="connectingWallet()"
+        >
+          @if (connectingWallet()) {
+            <span class="loader"></span>
+            Connecting...
+          } @else if (walletState().connected) {
+            Switch Wallet / Reconnect
+          } @else {
+            Connect Your MetaMask Wallet
+          }
+        </button>
+      </div>
+      @if (!walletState().connected && isAuthenticated()) {
+        <div class="wallet-prompt">
+          <p>🔐 <strong>Connect your wallet:</strong> You can use an existing wallet address with funds, or create a new one.</p>
+          <ul style="margin: 0.5rem 0 0 1.5rem; padding: 0; color: #bcc2d8; font-size: 0.875rem;">
+            <li><strong>To use an existing wallet:</strong> Import it into MetaMask first (MetaMask → Account menu → Import Account), then click "Connect Your MetaMask Wallet" and select it.</li>
+            <li><strong>To create a new wallet:</strong> Click "Connect Your MetaMask Wallet" and MetaMask will guide you to create one.</li>
+          </ul>
+          <p style="margin-top: 0.75rem; margin-bottom: 0; color: #8d92aa; font-size: 0.8125rem;">Each user account must have its own unique wallet address linked to their phone number.</p>
+        </div>
+      }
+    </div>
+    <div class="hero-card">
+      <div class="card-header">
+        <p>Status</p>
+        <span class="status-dot" [class.connected]="walletState().connected"></span>
+        <span>{{ walletState().connected ? 'Wallet linked' : 'Awaiting connection' }}</span>
+      </div>
+      <div class="card-body">
+        <p class="label">Primary wallet</p>
+        <h3>{{ formatAddress(walletState().address) }}</h3>
+        <p class="subtle">{{ walletState().networkName }}</p>
+
+        <div class="balance-tile">
+          <p>Live balance</p>
+          <h2>{{ walletState().balance }} ETH</h2>
+        </div>
+
+        <div class="card-foot">
+          <p>Chain ID</p>
+          <span>{{ walletState().chainId ?? '—' }}</span>
+        </div>
+    </div>
+      @if (isMetaMaskMissing()) {
+        <a
+          class="meta-warning"
+          href="https://metamask.io/download/"
+            target="_blank"
+            rel="noopener"
+          >
+          Install MetaMask to continue
+          </a>
+        }
+      </div>
+  </header>
+
+  <section class="payment-grid">
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Send a blockchain payment</p>
+          <h2>Authorize a settlement</h2>
+        </div>
+        <span class="inline-status" [class.ready]="walletState().connected">
+          {{ walletState().connected ? 'Connected' : 'Wallet idle' }}
+        </span>
+      </div>
+
+      <form [formGroup]="paymentForm" (ngSubmit)="submitPayment()" novalidate>
+        <div class="field-row">
+          <label>
+            Amount
+            <input type="number" step="0.0001" min="0" formControlName="amount" placeholder="0.00" />
+          </label>
+          <label>
+            Asset
+            <select formControlName="currency">
+              <option value="USDC">USDC</option>
+              <option value="USDT">USDT</option>
+              <option value="ETH">ETH</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Search by phone number (optional)
+          <small style="display: block; color: #8d92aa; font-size: 0.75rem; margin-bottom: 0.5rem;">Only shows wallet addresses linked to this phone number</small>
+          <div class="phone-search-container">
+            <input
+              type="tel"
+              formControlName="phoneSearch"
+              placeholder="(123) 456-7890"
+              autocomplete="off"
+              (input)="phoneSearchQuery.set($any($event.target).value)"
+              (blur)="hidePhoneResults()"
+              (focus)="showPhoneResultsIfAvailable()"
+            />
+            @if (searchingPhone()) {
+              <span class="search-loader"></span>
+            }
+            @if (showPhoneResults() && phoneSearchResults().length > 0) {
+              <div class="phone-search-results">
+                @for (result of phoneSearchResults(); track result.address) {
+                  <button
+                    type="button"
+                    class="wallet-option"
+                    (click)="selectWalletAddress(result.address)"
+                  >
+                    <span class="wallet-address">{{ formatAddress(result.address) }}</span>
+                    <span class="wallet-full">{{ result.address }}</span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </label>
+
+        <label>
+          Recipient wallet
+          <input
+            type="text"
+            formControlName="recipientWallet"
+            placeholder="0x87...ff23 or search by phone above"
+            autocomplete="off"
+          />
+        </label>
+
+        <label>
+          Internal reference (optional)
+          <input type="text" formControlName="reference" placeholder="Invoice #123" />
+        </label>
+
+        <label>
+          Memo (optional)
+          <textarea rows="3" formControlName="memo" placeholder="Share additional context"></textarea>
+        </label>
+
+        <button type="submit" class="primary block" [disabled]="submittingPayment()">
+          {{ submittingPayment() ? 'Dispatching...' : 'Dispatch payment intent' }}
+        </button>
+      </form>
+    </article>
+
+    <article class="panel activity">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Transaction history</p>
+          <h2>Latest activity</h2>
+          @if (isAuthenticated()) {
+            <small style="display: block; color: #8d92aa; font-size: 0.75rem; margin-top: 0.25rem;">Showing your recent transactions</small>
+          }
+        </div>
+        <button type="button" class="ghost tiny" (click)="loadRecentPayments()" [disabled]="!isAuthenticated()" title="Refresh transaction history">Refresh</button>
+      </div>
+      <ul>
+        @for (payment of payments(); track payment.id) {
+          <li>
+            <div>
+              <p class="hash">{{ payment.transaction_hash ?? 'Pending signature' }}</p>
+              <p class="wallet">{{ payment.to_address }}</p>
+    </div>
+            <div class="right">
+              <p class="amount">
+                {{ payment.amount }} {{ payment.currency }}
+              </p>
+              <span [class]="statusClass(payment.status)">
+                {{ payment.status }}
+              </span>
+  </div>
+          </li>
+        }
+      </ul>
+    </article>
+  </section>
+
+  <section class="feature-grid">
+    @for (feature of features; track feature.title) {
+      <article>
+        <h3>{{ feature.title }}</h3>
+        <p>{{ feature.body }}</p>
+      </article>
+    }
+  </section>
+
+  <section class="workflow">
+    <div>
+      <p class="eyebrow">Simple and secure</p>
+      <h2>How to send a payment</h2>
+      <p>
+        Send blockchain payments quickly and securely. Connect your wallet, enter the payment details,
+        and confirm the transaction. Your payment will be processed on the blockchain instantly.
+      </p>
+    </div>
+    <ol>
+      @for (step of workflow; track step.title; let idx = $index) {
+        <li>
+          <span class="badge">0{{ idx + 1 }}</span>
+          <div>
+            <h3>{{ step.title }}</h3>
+            <p>{{ step.body }}</p>
+          </div>
+        </li>
+      }
+    </ol>
+  </section>
+
+    <section class="cta">
+      <div>
+        <p>Ready to launch?</p>
+        <h2>Connect MetaMask and settle your first on-chain payment.</h2>
+      </div>
+      <button type="button" class="secondary" (click)="connectWallet()">Link wallet</button>
+    </section>
+  }
+
+<router-outlet />
+</div>

@@ -1,0 +1,116 @@
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-header">
+      <h1>Create account</h1>
+      <p>Get started with blockchain payments</p>
+    </div>
+
+    @if (successMessage()) {
+      <div class="success-banner">
+        <span>{{ successMessage() }}</span>
+      </div>
+    }
+    @if (errorMessage()) {
+      <div class="error-banner">
+        <span>{{ errorMessage() }}</span>
+      </div>
+    }
+
+    <form [formGroup]="signupForm" (ngSubmit)="onSubmit()" novalidate>
+      <div class="form-group">
+        <label for="email">Email address</label>
+        <input
+          id="email"
+          type="email"
+          formControlName="email"
+          placeholder="you@example.com"
+          [class.error]="signupForm.get('email')?.invalid && signupForm.get('email')?.touched"
+        />
+        @if (signupForm.get('email')?.invalid && signupForm.get('email')?.touched) {
+          <span class="field-error">
+            @if (signupForm.get('email')?.errors?.['required']) {
+              Email is required
+            } @else if (signupForm.get('email')?.errors?.['email']) {
+              Please enter a valid email address
+            }
+          </span>
+        }
+      </div>
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input
+          id="username"
+          type="text"
+          formControlName="username"
+          placeholder="Choose a username"
+          [class.error]="signupForm.get('username')?.invalid && signupForm.get('username')?.touched"
+        />
+        @if (signupForm.get('username')?.invalid && signupForm.get('username')?.touched) {
+          <span class="field-error">
+            @if (signupForm.get('username')?.errors?.['required']) {
+              Username is required
+            } @else if (signupForm.get('username')?.errors?.['minlength']) {
+              Username must be at least 3 characters
+            }
+          </span>
+        }
+      </div>
+
+      <div class="form-group">
+        <label for="phone_number">Phone number</label>
+        <input
+          id="phone_number"
+          type="tel"
+          formControlName="phone_number"
+          placeholder="1234567890"
+          maxlength="10"
+          [class.error]="signupForm.get('phone_number')?.invalid && signupForm.get('phone_number')?.touched"
+        />
+        @if (signupForm.get('phone_number')?.invalid && signupForm.get('phone_number')?.touched) {
+          <span class="field-error">
+            @if (signupForm.get('phone_number')?.errors?.['required']) {
+              Phone number is required
+            } @else if (signupForm.get('phone_number')?.errors?.['pattern']) {
+              Please enter a valid 10-digit phone number
+            }
+          </span>
+        }
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          type="password"
+          formControlName="password"
+          placeholder="At least 8 characters"
+          [class.error]="signupForm.get('password')?.invalid && signupForm.get('password')?.touched"
+        />
+        @if (signupForm.get('password')?.invalid && signupForm.get('password')?.touched) {
+          <span class="field-error">
+            @if (signupForm.get('password')?.errors?.['required']) {
+              Password is required
+            } @else if (signupForm.get('password')?.errors?.['minlength']) {
+              Password must be at least 8 characters
+            }
+          </span>
+        }
+      </div>
+
+      <button type="submit" class="primary block" [disabled]="isLoading()">
+        @if (isLoading()) {
+          <span class="loader"></span>
+          Creating account...
+        } @else {
+          Create account
+        }
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <p>Already have an account? <a routerLink="/login">Sign in</a></p>
+    </div>
+  </div>
+</div>
+
