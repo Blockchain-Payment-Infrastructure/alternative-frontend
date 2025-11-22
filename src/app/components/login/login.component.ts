@@ -43,6 +43,11 @@ export class LoginComponent {
       next: () => {
         this.successMessage.set('Login successful! Redirecting...');
         this.router.navigate(['/']);
+                setTimeout(() => {
+            this.isLoading.set(false);
+            this.successMessage.set(null);
+            window.scrollTo(0, 0); // Scroll to the top
+        }, 1000);
       },
       error: (error) => {
         this.isLoading.set(false);

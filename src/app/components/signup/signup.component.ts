@@ -52,6 +52,13 @@ export class SignupComponent {
           next: () => {
             this.successMessage.set('Welcome! Redirecting to home page...');
             this.router.navigate(['/']);
+
+                    setTimeout(() => {
+            this.isLoading.set(false);
+            this.successMessage.set(null);
+            window.scrollTo(0, 0); // Scroll to the top
+        }, 1000);
+
           },
           error: (error) => {
             this.isLoading.set(false);
