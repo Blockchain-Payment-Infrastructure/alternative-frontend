@@ -20,6 +20,7 @@ export class SignupComponent {
   errorMessage = signal<string | null>(null);
   successMessage = signal<string | null>(null);
   isLoading = signal(false);
+  passwordVisible = signal(false);
 
   constructor() {
     this.signupForm = this.fb.group({

@@ -44,6 +44,7 @@ const NETWORK_MAP: Record<string, string> = {
 export class WalletService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.apiUrl;
+  private readonly WALLET_ADDRESS_KEY = 'walletAddress';
 
   private get provider(): EthereumProvider | undefined {
     return typeof window !== 'undefined'
@@ -83,9 +84,13 @@ export class WalletService {
     }
 
     const chainId = await provider.request<string>({ method: 'eth_chainId' });
+    const address = accounts[0];
+
+    // Persist wallet address to localStorage
+    this.persistWalletAddress(address);
 
     return {
-      address: accounts[0],
+      address,
       chainId,
       networkName: NETWORK_MAP[chainId?.toLowerCase() ?? ''] ?? 'Unknown Network'
     };
@@ -108,6 +113,9 @@ export class WalletService {
     } catch (e) {
       // Ignore errors - MetaMask may not support this
     }
+
+    // Clear persisted wallet address
+    this.clearPersistedWalletAddress();
   }
 
   async connectWalletWithSignature(message: string, address: string): Promise<{ success: boolean; walletAddress: string; message: string }> {
@@ -189,6 +197,26 @@ export class WalletService {
     const fraction = remainder.toString().padStart(18, '0').slice(0, 4);
 
     return `${etherInteger}.${fraction}`.replace(/\.$/, '');
+  }
+
+  // Wallet address persistence methods
+  persistWalletAddress(address: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.WALLET_ADDRESS_KEY, address);
+    }
+  }
+
+  getPersistedWalletAddress(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(this.WALLET_ADDRESS_KEY);
+    }
+    return null;
+  }
+
+  clearPersistedWalletAddress(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(this.WALLET_ADDRESS_KEY);
+    }
   }
 }
 

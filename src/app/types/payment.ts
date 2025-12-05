@@ -16,5 +16,6 @@ export interface Payment {
   transaction_hash?: string;
   createdAt: string;
   confirmed_at?: string;
+  description?: string;
 }
 

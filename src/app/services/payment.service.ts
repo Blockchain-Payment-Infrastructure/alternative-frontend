@@ -23,5 +23,22 @@ export class PaymentService {
         catchError(() => of([]))
       );
   }
+
+  getExchangeRates(): Observable<any> {
+    const url = 'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd,inr,eur,gbp';
+    return this.http.get(url).pipe(
+      catchError(() => {
+        // Return fallback rates if API fails
+        return of({
+          ethereum: {
+            usd: 3000,
+            inr: 250000,
+            eur: 2800,
+            gbp: 2400
+          }
+        });
+      })
+    );
+  }
 }
 

@@ -133,5 +133,33 @@ export class AuthService {
       userEmail: null
     });
   }
+
+  // Account management methods
+  changePassword(payload: { old_password: string; new_password: string }): Observable<{ message: string }> {
+    const token = this.getAccessToken();
+    if (!token) {
+      return throwError(() => new Error('Missing authentication token'));
+    }
+    const headers = { 'Authorization': `Bearer ${token}` };
+    return this.http.patch<{ message: string }>(`${this.baseUrl}/account/change-password`, payload, { headers });
+  }
+
+  updateEmail(payload: { new_email: string; password: string }): Observable<{ message: string }> {
+    const token = this.getAccessToken();
+    if (!token) {
+      return throwError(() => new Error('Missing authentication token'));
+    }
+    const headers = { 'Authorization': `Bearer ${token}` };
+    return this.http.patch<{ message: string }>(`${this.baseUrl}/account/update-email`, payload, { headers });
+  }
+
+  deleteAccount(payload: { password: string }): Observable<{ message: string }> {
+    const token = this.getAccessToken();
+    if (!token) {
+      return throwError(() => new Error('Missing authentication token'));
+    }
+    const headers = { 'Authorization': `Bearer ${token}` };
+    return this.http.request<{ message: string }>('delete', `${this.baseUrl}/account/delete`, { body: payload, headers });
+  }
 }
 

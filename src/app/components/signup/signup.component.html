@@ -19,13 +19,28 @@
     <form [formGroup]="signupForm" (ngSubmit)="onSubmit()" novalidate>
       <div class="form-group">
         <label for="email">Email address</label>
-        <input
-          id="email"
-          type="email"
-          formControlName="email"
-          placeholder="you@example.com"
-          [class.error]="signupForm.get('email')?.invalid && signupForm.get('email')?.touched"
-        />
+        <div class="input-wrapper">
+          <input
+            id="email"
+            type="email"
+            formControlName="email"
+            placeholder="you@example.com"
+            [class.error]="signupForm.get('email')?.invalid && signupForm.get('email')?.touched"
+          />
+          @if (signupForm.get('email')?.value) {
+            <button
+              type="button"
+              class="input-action"
+              (click)="signupForm.patchValue({ email: '' })"
+              aria-label="Clear email"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          }
+        </div>
         @if (signupForm.get('email')?.invalid && signupForm.get('email')?.touched) {
           <span class="field-error">
             @if (signupForm.get('email')?.errors?.['required']) {
@@ -39,13 +54,28 @@
 
       <div class="form-group">
         <label for="username">Username</label>
-        <input
-          id="username"
-          type="text"
-          formControlName="username"
-          placeholder="Choose a username"
-          [class.error]="signupForm.get('username')?.invalid && signupForm.get('username')?.touched"
-        />
+        <div class="input-wrapper">
+          <input
+            id="username"
+            type="text"
+            formControlName="username"
+            placeholder="Choose a username"
+            [class.error]="signupForm.get('username')?.invalid && signupForm.get('username')?.touched"
+          />
+          @if (signupForm.get('username')?.value) {
+            <button
+              type="button"
+              class="input-action"
+              (click)="signupForm.patchValue({ username: '' })"
+              aria-label="Clear username"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          }
+        </div>
         @if (signupForm.get('username')?.invalid && signupForm.get('username')?.touched) {
           <span class="field-error">
             @if (signupForm.get('username')?.errors?.['required']) {
@@ -59,14 +89,29 @@
 
       <div class="form-group">
         <label for="phone_number">Phone number</label>
-        <input
-          id="phone_number"
-          type="tel"
-          formControlName="phone_number"
-          placeholder="1234567890"
-          maxlength="10"
-          [class.error]="signupForm.get('phone_number')?.invalid && signupForm.get('phone_number')?.touched"
-        />
+        <div class="input-wrapper">
+          <input
+            id="phone_number"
+            type="tel"
+            formControlName="phone_number"
+            placeholder="1234567890"
+            maxlength="10"
+            [class.error]="signupForm.get('phone_number')?.invalid && signupForm.get('phone_number')?.touched"
+          />
+          @if (signupForm.get('phone_number')?.value) {
+            <button
+              type="button"
+              class="input-action"
+              (click)="signupForm.patchValue({ phone_number: '' })"
+              aria-label="Clear phone number"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          }
+        </div>
         @if (signupForm.get('phone_number')?.invalid && signupForm.get('phone_number')?.touched) {
           <span class="field-error">
             @if (signupForm.get('phone_number')?.errors?.['required']) {
@@ -80,13 +125,48 @@
 
       <div class="form-group">
         <label for="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          formControlName="password"
-          placeholder="At least 8 characters"
-          [class.error]="signupForm.get('password')?.invalid && signupForm.get('password')?.touched"
-        />
+        <div class="input-wrapper">
+          <input
+            id="password"
+            [type]="passwordVisible() ? 'text' : 'password'"
+            formControlName="password"
+            placeholder="At least 8 characters"
+            [class.error]="signupForm.get('password')?.invalid && signupForm.get('password')?.touched"
+          />
+          <div class="input-actions">
+            @if (signupForm.get('password')?.value) {
+              <button
+                type="button"
+                class="input-action"
+                (click)="signupForm.patchValue({ password: '' })"
+                aria-label="Clear password"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            }
+            <button
+              type="button"
+              class="input-action"
+              (click)="passwordVisible.set(!passwordVisible())"
+              aria-label="Toggle password visibility"
+            >
+              @if (passwordVisible()) {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                  <line x1="1" y1="1" x2="23" y2="23"></line>
+                </svg>
+              } @else {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              }
+            </button>
+          </div>
+        </div>
         @if (signupForm.get('password')?.invalid && signupForm.get('password')?.touched) {
           <span class="field-error">
             @if (signupForm.get('password')?.errors?.['required']) {
@@ -98,7 +178,12 @@
         }
       </div>
 
-      <button type="submit" class="primary block" [disabled]="isLoading()">
+      <button 
+        type="submit" 
+        class="primary block" 
+        [disabled]="isLoading() || signupForm.invalid"
+        [class.disabled]="isLoading() || signupForm.invalid"
+      >
         @if (isLoading()) {
           <span class="loader"></span>
           Creating account...

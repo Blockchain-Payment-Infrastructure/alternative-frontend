@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal, effect } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { RouterOutlet, Router, RouterLink } from '@angular/router';
@@ -7,6 +7,7 @@ import { Payment } from './types/payment';
 import { WalletService } from './services/wallet.service';
 import { PaymentService } from './services/payment.service';
 import { AuthService } from './services/auth.service';
+import QRCode from 'qrcode';
 
 interface WalletSnapshot {
   connected: boolean;
@@ -25,7 +26,7 @@ interface ToastMessage {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, ReactiveFormsModule],
+  imports: [CommonModule, RouterOutlet, RouterLink, ReactiveFormsModule, DatePipe],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -70,17 +71,61 @@ export class AppComponent {
   submittingPayment = signal(false);
   notifications = signal<ToastMessage[]>([]);
   
+  // Wallet address display
+  showWalletAddress = signal(false);
+  
+  // Currency conversion
+  exchangeRates = signal<any>(null);
+  selectedFiatCurrency = signal<'USD' | 'INR' | 'GBP' | 'EUR'>('USD');
+  fiatCurrencies: { code: 'USD' | 'INR' | 'GBP' | 'EUR', symbol: string }[] = [
+    { code: 'USD', symbol: '$' },
+    { code: 'INR', symbol: '₹' },
+    { code: 'GBP', symbol: '£' },
+    { code: 'EUR', symbol: '€' }
+  ];
+  refreshingBalance = signal(false);
+  
   // Phone number search
   phoneSearchQuery = signal('');
   phoneSearchResults = signal<{ address: string }[]>([]);
   searchingPhone = signal(false);
   showPhoneResults = signal(false);
+  phoneSearchInput = signal('');
+  
+  // Payment modal
+  showPaymentModal = signal(false);
+  paymentModalRecipient = signal<string>('');
+  paymentModalAmount = signal<number | null>(null);
+  paymentModalDescription = signal<string>('');
+  
+  // QR Code tile
+  showQRCodeTile = signal(false);
+  qrCodeDataUrl = signal<string>('');
+  
+  // Send tile (phone search)
+  showSendTile = signal(false);
+  
+  // Account settings
+  showAccountSettings = signal(false);
+  showChangePasswordForm = signal(false);
+  showUpdateEmailForm = signal(false);
+  showDeleteAccountForm = signal(false);
+  
+  // Account form fields
+  oldPassword = signal('');
+  newPassword = signal('');
+  newEmail = signal('');
+  accountPassword = signal('');
+  accountPassForEmail = signal('');
+  accountPassForDelete = signal('');
+  
+  // Account action loading
+  isProcessingAccountAction = signal(false);
 
   readonly paymentForm = this.fb.nonNullable.group({
     amount: [0.25, [Validators.required, Validators.min(0.0001)]],
     currency: ['USDC', [Validators.required]],
     recipientWallet: ['', [Validators.required, Validators.minLength(6)]],
-    phoneSearch: [''], // For phone number search
     reference: [''],
     memo: ['']
   });
@@ -117,6 +162,22 @@ export class AppComponent {
   ];
 
   constructor() {
+    // Fetch exchange rates on init
+    this.fetchExchangeRates();
+    
+    // Check for persisted wallet address on init
+    const persistedAddress = this.walletService.getPersistedWalletAddress();
+    if (persistedAddress && this.isAuthenticated()) {
+      // Restore wallet state if address is persisted
+      this.walletState.update(state => ({
+        ...state,
+        address: persistedAddress,
+        connected: true
+      }));
+      // Fetch balance for persisted address
+      this.refreshWalletBalance();
+    }
+
     // Check for existing wallets when authenticated - but don't auto-connect
     effect(() => {
       if (this.isAuthenticated()) {
@@ -131,22 +192,11 @@ export class AppComponent {
           balance: '0.0000',
           networkName: 'Not connected'
         });
+        this.showWalletAddress.set(false);
       }
     });
 
     this.loadRecentPayments();
-    
-    // Watch for phone number search changes
-    this.paymentForm.get('phoneSearch')?.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((value) => {
-        if (value) {
-          this.searchWalletByPhone(value);
-        } else {
-          this.phoneSearchResults.set([]);
-          this.showPhoneResults.set(false);
-        }
-      });
     
     this.walletService.onAccountChange((accounts) => {
       if (!accounts.length) {
@@ -276,6 +326,11 @@ export class AppComponent {
         networkName: connection.networkName,
         balance
       });
+      // Wallet address is already persisted in connectWallet method
+      // Fetch exchange rates if not already loaded
+      if (!this.exchangeRates()) {
+        this.fetchExchangeRates();
+      }
     } catch (error: any) {
       if (error?.code === 4001) {
         // User rejected the request
@@ -307,6 +362,7 @@ export class AppComponent {
           balance: '0.0000',
           networkName: 'Not connected'
         });
+        this.showWalletAddress.set(false);
         this.router.navigate(['/login']);
       },
       error: () => {
@@ -316,6 +372,7 @@ export class AppComponent {
           balance: '0.0000',
           networkName: 'Not connected'
         });
+        this.showWalletAddress.set(false);
         this.router.navigate(['/login']);
       }
     });
@@ -514,8 +571,7 @@ export class AppComponent {
               currency: 'USDC',
               recipientWallet: '',
               reference: '',
-              memo: '',
-              phoneSearch: ''
+              memo: ''
             });
             
             // Reload payments to get updated status from backend
@@ -766,6 +822,16 @@ export class AppComponent {
     return `${value.slice(0, 6)}...${value.slice(-4)}`;
   }
 
+  isTransactionSent(payment: Payment): boolean {
+    // If we have a from_address and it matches the connected wallet, it's sent
+    if (payment.from_address && this.walletState().address) {
+      return payment.from_address.toLowerCase() === this.walletState().address!.toLowerCase();
+    }
+    // If no from_address, assume it's sent (outgoing payment)
+    // This is a heuristic - you might want to adjust based on your backend logic
+    return true;
+  }
+
   protected statusClass(status: Payment['status']): string {
     const statusMap: Record<Payment['status'], string> = {
       confirmed: 'status-pill success',
@@ -786,18 +852,31 @@ export class AppComponent {
     this.notifications.update((list) => list.filter((toast) => toast.id !== id));
   }
 
-  searchWalletByPhone(phoneNumber: string): void {
+  searchWalletByPhone(): void {
+    const phoneNumber = this.phoneSearchInput();
+    if (!phoneNumber) {
+      this.pushToast('error', 'Please enter a phone number to search');
+      return;
+    }
+
     const cleanPhone = phoneNumber.replace(/\D/g, '');
     
     // Only search if we have exactly 10 digits
     if (cleanPhone.length !== 10) {
+      this.pushToast('error', 'Phone number must be exactly 10 digits');
       this.phoneSearchResults.set([]);
       this.showPhoneResults.set(false);
       return;
     }
 
+    if (!this.isAuthenticated()) {
+      this.pushToast('error', 'Please log in to search for wallet addresses');
+      return;
+    }
+
     this.searchingPhone.set(true);
     this.showPhoneResults.set(true);
+    this.phoneSearchQuery.set(cleanPhone);
 
     this.walletService.getWalletAddressesByPhone(cleanPhone)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -809,15 +888,8 @@ export class AppComponent {
           
           if (addresses.length === 0) {
             this.pushToast('info', 'No wallet addresses found for this phone number');
-          } else if (addresses.length === 1) {
-            // If there's exactly one address, automatically fill it in
-            this.selectWalletAddress(addresses[0].address);
           } else {
-            // If there are multiple addresses, show dropdown but auto-fill the first one
-            this.paymentForm.patchValue({
-              recipientWallet: addresses[0].address
-            });
-            this.pushToast('info', `Found ${addresses.length} wallet addresses. First one auto-filled. Click to see others.`);
+            this.pushToast('success', `Found ${addresses.length} wallet address${addresses.length > 1 ? 'es' : ''}`);
           }
         },
         error: (error) => {
@@ -826,31 +898,343 @@ export class AppComponent {
           this.searchingPhone.set(false);
           if (error?.status !== 400) {
             this.pushToast('error', error?.error?.message || 'Failed to search wallet addresses');
+          } else {
+            this.pushToast('info', 'No wallet addresses found for this phone number');
           }
         }
       });
   }
 
   selectWalletAddress(address: string): void {
-    // Fill in the recipient wallet field with the selected address
+    // Fill in the recipient wallet field in the payment form
     this.paymentForm.patchValue({
-      recipientWallet: address,
-      phoneSearch: '' // Clear phone search field
+      recipientWallet: address
     });
+    this.phoneSearchInput.set('');
     this.phoneSearchResults.set([]);
     this.showPhoneResults.set(false);
-    this.pushToast('success', 'Wallet address filled in');
+    this.pushToast('success', 'Wallet address filled in payment form');
   }
 
-  hidePhoneResults(): void {
-    setTimeout(() => {
-      this.showPhoneResults.set(false);
-    }, 200);
+  clearPhoneSearch(): void {
+    this.phoneSearchInput.set('');
+    this.phoneSearchResults.set([]);
+    this.showPhoneResults.set(false);
   }
 
-  showPhoneResultsIfAvailable(): void {
-    if (this.phoneSearchResults().length > 0) {
-      this.showPhoneResults.set(true);
+
+  toggleWalletAddressDisplay(): void {
+    if (this.walletState().connected && this.walletState().address) {
+      this.showWalletAddress.set(!this.showWalletAddress());
+    } else {
+      this.showWalletAddress.set(false);
     }
+  }
+
+  // Currency conversion methods
+  fetchExchangeRates(): void {
+    this.paymentService.getExchangeRates()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rates) => {
+          this.exchangeRates.set(rates);
+        },
+        error: (err) => {
+          console.error('Failed to fetch exchange rates:', err);
+          // Fallback rates are already set in the service
+          this.exchangeRates.set({
+            ethereum: {
+              usd: 3000,
+              inr: 250000,
+              eur: 2800,
+              gbp: 2400
+            }
+          });
+        }
+      });
+  }
+
+  get convertedBalance(): { value: string, symbol: string } {
+    const balance = parseFloat(this.walletState().balance || '0');
+    const rates = this.exchangeRates();
+    
+    if (balance === 0 || !rates || !rates.ethereum) {
+      return { value: '0.00', symbol: this.fiatCurrencies.find(c => c.code === this.selectedFiatCurrency())?.symbol || '' };
+    }
+    
+    const currency = this.selectedFiatCurrency().toLowerCase();
+    const rate = rates.ethereum[currency];
+    
+    if (!rate) {
+      return { value: 'N/A', symbol: '' };
+    }
+    
+    const convertedValue = balance * rate;
+    const symbol = this.fiatCurrencies.find(c => c.code === this.selectedFiatCurrency())?.symbol || '';
+    
+    const formattedValue = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(convertedValue);
+    
+    return { value: formattedValue, symbol };
+  }
+
+  async refreshWalletBalance(): Promise<void> {
+    if (!this.walletState().connected || !this.walletState().address) {
+      return;
+    }
+
+    this.refreshingBalance.set(true);
+    try {
+      const balance = await this.walletService.getBalance(this.walletState().address!);
+      this.walletState.update(state => ({
+        ...state,
+        balance
+      }));
+    } catch (error) {
+      this.pushToast('error', 'Failed to refresh balance');
+    } finally {
+      this.refreshingBalance.set(false);
+    }
+  }
+
+  // Payment modal methods
+  openPaymentModal(recipientAddress: string): void {
+    if (!this.walletState().connected) {
+      this.pushToast('error', 'Please connect your wallet first');
+      return;
+    }
+    this.paymentModalRecipient.set(recipientAddress);
+    this.paymentModalAmount.set(null);
+    this.paymentModalDescription.set('');
+    this.showPaymentModal.set(true);
+  }
+
+  closePaymentModal(): void {
+    if (!this.submittingPayment()) {
+      this.showPaymentModal.set(false);
+      this.paymentModalRecipient.set('');
+      this.paymentModalAmount.set(null);
+      this.paymentModalDescription.set('');
+    }
+  }
+
+  async sendPaymentFromModal(): Promise<void> {
+    if (!this.paymentModalRecipient() || !this.paymentModalAmount() || this.paymentModalAmount()! <= 0) {
+      this.pushToast('error', 'Please enter a valid amount and recipient');
+      return;
+    }
+
+    // Use existing payment submission logic but with modal values
+    const originalRecipient = this.paymentForm.get('recipientWallet')?.value;
+    const originalAmount = this.paymentForm.get('amount')?.value;
+    const originalMemo = this.paymentForm.get('memo')?.value;
+
+    // Temporarily set form values
+    this.paymentForm.patchValue({
+      recipientWallet: this.paymentModalRecipient(),
+      amount: this.paymentModalAmount()!,
+      memo: this.paymentModalDescription()
+    });
+
+    // Submit payment
+    await this.submitPayment();
+
+    // Restore original values or clear
+    this.paymentForm.patchValue({
+      recipientWallet: originalRecipient || '',
+      amount: originalAmount || 0.25,
+      memo: originalMemo || ''
+    });
+
+    // Close modal after submission starts
+    this.closePaymentModal();
+  }
+
+  // Send/Receive button methods
+  toggleSendTile(): void {
+    if (!this.walletState().connected) {
+      this.pushToast('error', 'Please connect your wallet first');
+      return;
+    }
+    this.showSendTile.set(!this.showSendTile());
+    // Close receive tile if open
+    if (this.showSendTile()) {
+      this.showQRCodeTile.set(false);
+    }
+  }
+
+  async toggleQRCodeTile(): Promise<void> {
+    if (!this.walletState().connected || !this.walletState().address) {
+      this.pushToast('error', 'Please connect your wallet first');
+      return;
+    }
+
+    const isOpening = !this.showQRCodeTile();
+    this.showQRCodeTile.set(isOpening);
+    
+    // Close send tile if open
+    if (isOpening) {
+      this.showSendTile.set(false);
+    }
+
+    // Generate QR code if opening and not already generated
+    if (isOpening && !this.qrCodeDataUrl()) {
+      try {
+        const address = this.walletState().address;
+        if (!address) {
+          this.pushToast('error', 'Wallet address not available');
+          return;
+        }
+        const qrDataUrl = await QRCode.toDataURL(address, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#6cf0ff',
+            light: '#05060a'
+          }
+        });
+        this.qrCodeDataUrl.set(qrDataUrl);
+      } catch (error) {
+        console.error('Failed to generate QR code:', error);
+        this.pushToast('error', 'Failed to generate QR code');
+        this.showQRCodeTile.set(false);
+      }
+    }
+  }
+
+  copyWalletAddress(): void {
+    const address = this.walletState().address;
+    if (!address) {
+      return;
+    }
+    navigator.clipboard.writeText(address);
+    this.pushToast('success', 'Wallet address copied to clipboard');
+  }
+
+  // Account settings methods
+  toggleAccountSettings(): void {
+    this.showAccountSettings.set(!this.showAccountSettings());
+    // Close other tiles when opening account settings
+    if (this.showAccountSettings()) {
+      this.showSendTile.set(false);
+      this.showQRCodeTile.set(false);
+    }
+  }
+
+  toggleChangePasswordForm(): void {
+    this.showChangePasswordForm.set(!this.showChangePasswordForm());
+    // Close other forms
+    if (this.showChangePasswordForm()) {
+      this.showUpdateEmailForm.set(false);
+      this.showDeleteAccountForm.set(false);
+    }
+  }
+
+  toggleUpdateEmailForm(): void {
+    this.showUpdateEmailForm.set(!this.showUpdateEmailForm());
+    // Close other forms
+    if (this.showUpdateEmailForm()) {
+      this.showChangePasswordForm.set(false);
+      this.showDeleteAccountForm.set(false);
+    }
+  }
+
+  toggleDeleteAccountForm(): void {
+    this.showDeleteAccountForm.set(!this.showDeleteAccountForm());
+    // Close other forms
+    if (this.showDeleteAccountForm()) {
+      this.showChangePasswordForm.set(false);
+      this.showUpdateEmailForm.set(false);
+    }
+  }
+
+  submitChangePassword(): void {
+    if (!this.oldPassword() || !this.newPassword()) {
+      this.pushToast('error', 'Please fill both password fields');
+      return;
+    }
+
+    this.isProcessingAccountAction.set(true);
+    this.authService.changePassword({
+      old_password: this.oldPassword(),
+      new_password: this.newPassword()
+    }).subscribe({
+      next: () => {
+        this.pushToast('success', 'Password changed successfully');
+        this.oldPassword.set('');
+        this.newPassword.set('');
+        this.showChangePasswordForm.set(false);
+        this.isProcessingAccountAction.set(false);
+      },
+      error: (err: any) => {
+        const errorMsg = err?.error?.message || err?.message || 'Failed to change password';
+        this.pushToast('error', errorMsg);
+        this.isProcessingAccountAction.set(false);
+      }
+    });
+  }
+
+  submitUpdateEmail(): void {
+    if (!this.newEmail() || !this.accountPassForEmail()) {
+      this.pushToast('error', 'Please fill both email and password fields');
+      return;
+    }
+
+    this.isProcessingAccountAction.set(true);
+    this.authService.updateEmail({
+      new_email: this.newEmail(),
+      password: this.accountPassForEmail()
+    }).subscribe({
+      next: () => {
+        this.pushToast('success', 'Email updated successfully');
+        // Update the email in auth state
+        this.authService.authState.update(state => ({
+          ...state,
+          userEmail: this.newEmail()
+        }));
+        localStorage.setItem('user_email', this.newEmail());
+        this.newEmail.set('');
+        this.accountPassForEmail.set('');
+        this.showUpdateEmailForm.set(false);
+        this.isProcessingAccountAction.set(false);
+      },
+      error: (err: any) => {
+        const errorMsg = err?.error?.message || err?.message || 'Failed to update email';
+        this.pushToast('error', errorMsg);
+        this.isProcessingAccountAction.set(false);
+      }
+    });
+  }
+
+  submitDeleteAccount(): void {
+    if (!this.accountPassForDelete()) {
+      this.pushToast('error', 'Please enter your password to confirm');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      return;
+    }
+
+    this.isProcessingAccountAction.set(true);
+    this.authService.deleteAccount({
+      password: this.accountPassForDelete()
+    }).subscribe({
+      next: () => {
+        this.pushToast('success', 'Account deleted successfully');
+        this.accountPassForDelete.set('');
+        this.showDeleteAccountForm.set(false);
+        this.isProcessingAccountAction.set(false);
+        // Logout and redirect to login
+        this.logout();
+      },
+      error: (err: any) => {
+        const errorMsg = err?.error?.message || err?.message || 'Failed to delete account';
+        this.pushToast('error', errorMsg);
+        this.isProcessingAccountAction.set(false);
+      }
+    });
   }
 }

@@ -31,6 +31,9 @@
         </div>
         <div class="nav-actions">
           <span class="user-email">{{ authService.authState().userEmail }}</span>
+          <button type="button" class="ghost" (click)="toggleAccountSettings()" title="Manage Account">
+            Account
+          </button>
           <button type="button" class="ghost" (click)="logout()">Logout</button>
         </div>
       </div>
@@ -47,6 +50,46 @@
         you built keep compliance checks, policy routing, and payment intelligence humming.
       </p>
       <div class="hero-actions">
+        @if (walletState().connected) {
+          <div class="send-receive-buttons">
+            <button
+              type="button"
+              class="send-btn"
+              [class.active]="showSendTile()"
+              (click)="toggleSendTile()"
+              title="Send payment by phone number"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+              Send
+            </button>
+            <button
+              type="button"
+              class="receive-btn"
+              [class.active]="showQRCodeTile()"
+              (click)="toggleQRCodeTile()"
+              title="Show QR code to receive payments"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="5" height="5"></rect>
+                <rect x="16" y="3" width="5" height="5"></rect>
+                <rect x="3" y="16" width="5" height="5"></rect>
+                <path d="M21 16h-3a2 2 0 0 1-2-2v-3"></path>
+                <path d="M21 21v.01"></path>
+                <path d="M12 7v3a2 2 0 0 1-2 2H7"></path>
+                <path d="M3 12h.01"></path>
+                <path d="M12 3h.01"></path>
+                <path d="M12 16v.01"></path>
+                <path d="M16 12h.01"></path>
+                <path d="M16 16v.01"></path>
+                <path d="M12 21h.01"></path>
+              </svg>
+              Receive
+            </button>
+          </div>
+        }
         <button
           type="button"
           class="primary"
@@ -63,6 +106,144 @@
           }
         </button>
       </div>
+      
+      <!-- Send Tile (Phone Search) -->
+      @if (showSendTile() && walletState().connected) {
+        <div class="action-tile send-tile">
+          <div class="tile-header">
+            <h3>Send Payment</h3>
+            <button type="button" class="tile-close" (click)="toggleSendTile()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="tile-content">
+            <!-- Phone Number Search Card Content -->
+            <div class="phone-search-content">
+              <div class="phone-search-input-group">
+                <div class="phone-search-input-wrapper">
+                  <input
+                    type="tel"
+                    [value]="phoneSearchInput()"
+                    (input)="phoneSearchInput.set($any($event.target).value)"
+                    placeholder="Enter 10-digit phone number (e.g., 9876543210)"
+                    autocomplete="off"
+                    class="phone-search-input"
+                  />
+                  @if (phoneSearchInput()) {
+                    <button
+                      type="button"
+                      class="input-clear-btn"
+                      (click)="clearPhoneSearch()"
+                      aria-label="Clear phone number"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  }
+                </div>
+                <button
+                  type="button"
+                  class="primary"
+                  (click)="searchWalletByPhone()"
+                  [disabled]="!phoneSearchInput() || searchingPhone()"
+                  [class.disabled]="!phoneSearchInput() || searchingPhone()"
+                >
+                  @if (searchingPhone()) {
+                    <span class="loader"></span>
+                    Searching...
+                  } @else {
+                    Search
+                  }
+                </button>
+              </div>
+              
+              @if (searchingPhone()) {
+                <div class="phone-search-status">
+                  <span class="loader"></span>
+                  <span>Searching for wallet addresses...</span>
+                </div>
+              } @else if (showPhoneResults() && phoneSearchResults().length > 0) {
+                <div class="phone-search-results-card">
+                  <p style="margin-bottom: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    Found {{ phoneSearchResults().length }} address{{ phoneSearchResults().length > 1 ? 'es' : '' }}. Click to use:
+                  </p>
+                  <div class="phone-search-results-list">
+                    @for (result of phoneSearchResults(); track result.address) {
+                      <button
+                        type="button"
+                        class="wallet-address-item"
+                        (click)="selectWalletAddress(result.address)"
+                      >
+                        <span class="wallet-address-full">{{ result.address }}</span>
+                        <span class="wallet-address-short">{{ formatAddress(result.address) }}</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+              } @else if (showPhoneResults() && phoneSearchResults().length === 0 && phoneSearchQuery()) {
+                <div class="phone-search-no-results">
+                  <p>No wallet address found for that phone number.</p>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+      
+      <!-- Receive Tile (QR Code) -->
+      @if (showQRCodeTile() && walletState().connected) {
+        <div class="action-tile receive-tile">
+          <div class="tile-header">
+            <h3>Receive Payment</h3>
+            <button type="button" class="tile-close" (click)="toggleQRCodeTile()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="tile-content">
+            <div class="qr-code-container">
+              @if (qrCodeDataUrl()) {
+                <img [src]="qrCodeDataUrl()" alt="Wallet QR Code" class="qr-code-image" />
+              } @else {
+                <div class="qr-loading">
+                  <span class="loader"></span>
+                  <p>Generating QR code...</p>
+                </div>
+              }
+            </div>
+            
+            <div class="wallet-address-display">
+              <p class="address-label">Your Wallet Address</p>
+              <div class="address-box">
+                <p class="address-text">{{ walletState().address }}</p>
+                <button
+                  type="button"
+                  class="copy-address-btn"
+                  (click)="copyWalletAddress()"
+                  title="Copy address"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copy
+                </button>
+              </div>
+            </div>
+            
+            <p class="qr-instructions">
+              Share this QR code or wallet address to receive payments. Anyone can send ETH to this address.
+            </p>
+          </div>
+        </div>
+      }
       @if (!walletState().connected && isAuthenticated()) {
         <div class="wallet-prompt">
           <p>🔐 <strong>Connect your wallet:</strong> You can use an existing wallet address with funds, or create a new one.</p>
@@ -88,12 +269,77 @@
         <div class="balance-tile">
           <p>Live balance</p>
           <h2>{{ walletState().balance }} ETH</h2>
+          
+          @if (walletState().connected && exchangeRates()) {
+            <div class="currency-selector" style="margin-top: 1rem;">
+              <label style="font-size: 0.75rem; color: #9aa0bf; margin-bottom: 0.5rem; display: block;">
+                Convert To
+              </label>
+              <select 
+                [value]="selectedFiatCurrency()"
+                (change)="selectedFiatCurrency.set($any($event.target).value)"
+                class="currency-select"
+              >
+                @for (currency of fiatCurrencies; track currency.code) {
+                  <option [value]="currency.code">{{ currency.code }}</option>
+                }
+              </select>
+            </div>
+            
+            <div class="converted-balance" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+              <p style="font-size: 0.75rem; color: #9aa0bf; margin-bottom: 0.25rem;">Converted Value</p>
+              <h3 style="font-size: 1.5rem; margin: 0; color: #6cf0ff;">
+                {{ convertedBalance.symbol }}{{ convertedBalance.value }}
+              </h3>
+              <p style="font-size: 0.75rem; color: #9aa0bf; margin-top: 0.25rem;">{{ selectedFiatCurrency() }}</p>
+            </div>
+            
+            <button
+              type="button"
+              class="refresh-balance-btn"
+              (click)="refreshWalletBalance()"
+              [disabled]="refreshingBalance()"
+              style="margin-top: 1rem; width: 100%;"
+            >
+              @if (refreshingBalance()) {
+                <span class="loader"></span>
+                Refreshing...
+              } @else {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; margin-right: 0.5rem;">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                Refresh Balance
+              }
+            </button>
+          }
         </div>
 
         <div class="card-foot">
           <p>Chain ID</p>
           <span>{{ walletState().chainId ?? '—' }}</span>
         </div>
+        
+        @if (walletState().connected && walletState().address) {
+          <div class="card-foot" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.75rem;">
+            <button 
+              type="button" 
+              class="ghost tiny" 
+              (click)="toggleWalletAddressDisplay()"
+              style="width: 100%; text-align: center;"
+            >
+              {{ showWalletAddress() ? 'Hide' : 'Show' }} Full Address
+            </button>
+            @if (showWalletAddress()) {
+              <div style="padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 0.5rem; border: 1px solid rgba(255, 255, 255, 0.1); word-break: break-all;">
+                <p style="font-family: monospace; font-size: 0.75rem; color: #6cf0ff; margin: 0; line-height: 1.5;">
+                  {{ walletState().address }}
+                </p>
+              </div>
+            }
+          </div>
+        }
     </div>
       @if (isMetaMaskMissing()) {
         <a
@@ -107,6 +353,7 @@
         }
       </div>
   </header>
+
 
   <section class="payment-grid">
     <article class="panel">
@@ -137,46 +384,26 @@
         </div>
 
         <label>
-          Search by phone number (optional)
-          <small style="display: block; color: #8d92aa; font-size: 0.75rem; margin-bottom: 0.5rem;">Only shows wallet addresses linked to this phone number</small>
-          <div class="phone-search-container">
+          Recipient wallet
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
             <input
-              type="tel"
-              formControlName="phoneSearch"
-              placeholder="(123) 456-7890"
+              type="text"
+              formControlName="recipientWallet"
+              placeholder="0x87...ff23 or use phone search above"
               autocomplete="off"
-              (input)="phoneSearchQuery.set($any($event.target).value)"
-              (blur)="hidePhoneResults()"
-              (focus)="showPhoneResultsIfAvailable()"
+              style="flex: 1;"
             />
-            @if (searchingPhone()) {
-              <span class="search-loader"></span>
-            }
-            @if (showPhoneResults() && phoneSearchResults().length > 0) {
-              <div class="phone-search-results">
-                @for (result of phoneSearchResults(); track result.address) {
-                  <button
-                    type="button"
-                    class="wallet-option"
-                    (click)="selectWalletAddress(result.address)"
-                  >
-                    <span class="wallet-address">{{ formatAddress(result.address) }}</span>
-                    <span class="wallet-full">{{ result.address }}</span>
-                  </button>
-                }
-              </div>
+            @if (paymentForm.get('recipientWallet')?.value && walletState().connected) {
+              <button
+                type="button"
+                class="ghost tiny"
+                (click)="openPaymentModal(paymentForm.get('recipientWallet')?.value || '')"
+                title="Open payment modal"
+              >
+                Send
+              </button>
             }
           </div>
-        </label>
-
-        <label>
-          Recipient wallet
-          <input
-            type="text"
-            formControlName="recipientWallet"
-            placeholder="0x87...ff23 or search by phone above"
-            autocomplete="off"
-          />
         </label>
 
         <label>
@@ -208,19 +435,51 @@
       </div>
       <ul>
         @for (payment of payments(); track payment.id) {
-          <li>
-            <div>
-              <p class="hash">{{ payment.transaction_hash ?? 'Pending signature' }}</p>
-              <p class="wallet">{{ payment.to_address }}</p>
-    </div>
-            <div class="right">
-              <p class="amount">
-                {{ payment.amount }} {{ payment.currency }}
-              </p>
-              <span [class]="statusClass(payment.status)">
-                {{ payment.status }}
-              </span>
-  </div>
+          <li class="transaction-item">
+            <div class="transaction-main">
+              <div class="transaction-info">
+                <div class="transaction-amount-row">
+                  <span class="transaction-type-icon" [class.sent]="isTransactionSent(payment)" [class.received]="!isTransactionSent(payment)">
+                    {{ isTransactionSent(payment) ? '−' : '+' }}
+                  </span>
+                  <p class="transaction-amount">
+                    {{ payment.amount }} {{ payment.currency }}
+                  </p>
+                </div>
+                <p class="transaction-hash">
+                  @if (isTransactionSent(payment)) {
+                    To: {{ formatAddress(payment.to_address) }}
+                  } @else {
+                    From: {{ formatAddress(payment.from_address || payment.to_address) }}
+                  }
+                </p>
+                @if (payment.transaction_hash) {
+                  <p class="transaction-hash-full" style="font-family: monospace; font-size: 0.7rem; color: #8d92aa; word-break: break-all;">
+                    {{ payment.transaction_hash }}
+                  </p>
+                }
+                <p class="transaction-date">
+                  <span class="date-label">{{ payment.createdAt | date:'MMM d, y' }}</span>
+                  <span class="time-label">{{ payment.createdAt | date:'h:mm a' }}</span>
+                </p>
+              </div>
+              <div class="transaction-status">
+                <span [class]="statusClass(payment.status)">
+                  {{ payment.status }}
+                </span>
+              </div>
+            </div>
+            @if (payment.description) {
+              <div class="transaction-description">
+                <p class="description-label">Description:</p>
+                <p class="description-text">{{ payment.description }}</p>
+              </div>
+            }
+          </li>
+        }
+        @if (payments().length === 0) {
+          <li class="transaction-empty">
+            <p>No recent transactions</p>
           </li>
         }
       </ul>
@@ -265,6 +524,166 @@
       </div>
       <button type="button" class="secondary" (click)="connectWallet()">Link wallet</button>
     </section>
+  }
+
+  <!-- Account Settings Tile -->
+  @if (showAccountSettings() && isAuthenticated()) {
+    <div class="action-tile account-settings-tile">
+      <div class="tile-header">
+        <h3>Manage Account</h3>
+        <button type="button" class="tile-close" (click)="toggleAccountSettings()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="tile-content account-settings-content">
+        <!-- Change Password Section -->
+        <div class="account-section">
+          <button
+            type="button"
+            class="account-action-btn"
+            (click)="toggleChangePasswordForm()"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Change Password
+          </button>
+          @if (showChangePasswordForm()) {
+            <div class="account-form">
+              <div class="form-group">
+                <label>Old Password</label>
+                <input
+                  type="password"
+                  [value]="oldPassword()"
+                  (input)="oldPassword.set($any($event.target).value)"
+                  placeholder="Enter current password"
+                />
+              </div>
+              <div class="form-group">
+                <label>New Password</label>
+                <input
+                  type="password"
+                  [value]="newPassword()"
+                  (input)="newPassword.set($any($event.target).value)"
+                  placeholder="Enter new password"
+                />
+              </div>
+              <button
+                type="button"
+                class="primary"
+                (click)="submitChangePassword()"
+                [disabled]="isProcessingAccountAction() || !oldPassword() || !newPassword()"
+                [class.disabled]="isProcessingAccountAction() || !oldPassword() || !newPassword()"
+              >
+                @if (isProcessingAccountAction()) {
+                  <span class="loader"></span>
+                  Updating...
+                } @else {
+                  Submit
+                }
+              </button>
+            </div>
+          }
+        </div>
+
+        <!-- Update Email Section -->
+        <div class="account-section">
+          <button
+            type="button"
+            class="account-action-btn"
+            (click)="toggleUpdateEmailForm()"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            Change Email
+          </button>
+          @if (showUpdateEmailForm()) {
+            <div class="account-form">
+              <div class="form-group">
+                <label>New Email</label>
+                <input
+                  type="email"
+                  [value]="newEmail()"
+                  (input)="newEmail.set($any($event.target).value)"
+                  placeholder="Enter new email address"
+                />
+              </div>
+              <div class="form-group">
+                <label>Password</label>
+                <input
+                  type="password"
+                  [value]="accountPassForEmail()"
+                  (input)="accountPassForEmail.set($any($event.target).value)"
+                  placeholder="Enter your password"
+                />
+              </div>
+              <button
+                type="button"
+                class="primary"
+                (click)="submitUpdateEmail()"
+                [disabled]="isProcessingAccountAction() || !newEmail() || !accountPassForEmail()"
+                [class.disabled]="isProcessingAccountAction() || !newEmail() || !accountPassForEmail()"
+              >
+                @if (isProcessingAccountAction()) {
+                  <span class="loader"></span>
+                  Updating...
+                } @else {
+                  Submit
+                }
+              </button>
+            </div>
+          }
+        </div>
+
+        <!-- Delete Account Section -->
+        <div class="account-section">
+          <button
+            type="button"
+            class="account-action-btn delete-btn"
+            (click)="toggleDeleteAccountForm()"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Delete Account
+          </button>
+          @if (showDeleteAccountForm()) {
+            <div class="account-form">
+              <div class="form-group">
+                <label>Password</label>
+                <input
+                  type="password"
+                  [value]="accountPassForDelete()"
+                  (input)="accountPassForDelete.set($any($event.target).value)"
+                  placeholder="Enter your password to confirm"
+                />
+              </div>
+              <button
+                type="button"
+                class="primary delete-account-btn"
+                (click)="submitDeleteAccount()"
+                [disabled]="isProcessingAccountAction() || !accountPassForDelete()"
+                [class.disabled]="isProcessingAccountAction() || !accountPassForDelete()"
+              >
+                @if (isProcessingAccountAction()) {
+                  <span class="loader"></span>
+                  Deleting...
+                } @else {
+                  Delete Account
+                }
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
   }
 
 <router-outlet />
