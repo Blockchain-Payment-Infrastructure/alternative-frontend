@@ -1,0 +1,78 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/frontend/browser",
+  "framework": "angular",
+  "rewrites": [
+    {
+      "source": "/auth/(.*)",
+      "destination": "https://backend-white-star-5153.fly.dev/auth/$1"
+    },
+    {
+      "source": "/wallet/(.*)",
+      "destination": "https://backend-white-star-5153.fly.dev/wallet/$1"
+    },
+    {
+      "source": "/payments/(.*)",
+      "destination": "https://backend-white-star-5153.fly.dev/payments/$1"
+    },
+    {
+      "source": "/account/(.*)",
+      "destination": "https://backend-white-star-5153.fly.dev/account/$1"
+    },
+    {
+      "source": "/health/(.*)",
+      "destination": "https://backend-white-star-5153.fly.dev/health/$1"
+    },
+    {
+      "source": "/ws/(.*)",
+      "destination": "https://backend-white-star-5153.fly.dev/ws/$1"
+    },
+    {
+      "source": "/auth",
+      "destination": "https://backend-white-star-5153.fly.dev/auth"
+    },
+    {
+      "source": "/wallet",
+      "destination": "https://backend-white-star-5153.fly.dev/wallet"
+    },
+    {
+      "source": "/payments",
+      "destination": "https://backend-white-star-5153.fly.dev/payments"
+    },
+    {
+      "source": "/account",
+      "destination": "https://backend-white-star-5153.fly.dev/account"
+    },
+    {
+      "source": "/health",
+      "destination": "https://backend-white-star-5153.fly.dev/health"
+    },
+    {
+      "source": "/ws",
+      "destination": "https://backend-white-star-5153.fly.dev/ws"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ]
+}
