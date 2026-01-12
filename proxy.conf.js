@@ -1,4 +1,4 @@
-const target = process.env.BACKEND_ORIGIN ?? 'https://backend-white-star-5153.fly.dev';
+const target = 'https://backend-white-star-5153.fly.dev';
 
 const baseProxy = {
   target,
